@@ -10,6 +10,9 @@ import (
   "sync"
 )
 
+///### TODO: PSUDO FUNCTION CALLS USED IN SOME PLACES CURRENTLY ###
+///### TODO: LOGGING TO CONSOLE ###
+
 func readTopology(path string) (map[string][]string, error) {
   file, err := os.Open(path)
   if err != nil {
@@ -211,28 +214,13 @@ func manageRfd(bgpEntry bgpEntry, as_policy asPolicyEntry) {
 	}
 }
 
-func initializeBgpTables() {
-	bgp_table := make(map[string][]string)
-
-}
-
-func updateBgpTables(bgp_traffic <-chan int, policies map[string][]int, topology map[string][]int,  log_message chan<- int) {
-	bgp_table := make(map[string][]string)
-	for {
-		bgp_packet := <-bgp_traffic
-		parsed_packet := strings.Split(bgp_packet, "|")
-		src_as_number,prefix,ann,del,rfd_damp,rfd_release := parsed_packet[0], parsed_packet[1], parsed_packet[2], parsed_packet[3], parsed_packet[4], parsed_packet[5]
-		if(ann) {
-			peers := topology[src_as_number]
-			for peer := range peers {
-				if _, ok := bgp_table[peer]; ok {
-
-					continue
-				}
-			}
-		}
+func initializeBgpTables(as string, policies map[string][]int, topology map[string][]string, bgp_table map[string][][]string, root_as bool) {
+	for i := range topology {
+		newBgpEntry := bgpEntry{prefix: i, pref: 0, route: {i}, active: false, available: true, rfd_penalty: 0, rfd_supress: false, rfd_time_reset: false}
+		addBgpEntry(newBgpEntry)
 	}
 }
+
 //BGP MESSAGE SPEC: "src_as_number|prefix|announce|delete|rfd_damp|rfd_release"
 
 func main() {
@@ -254,15 +242,8 @@ func main() {
 		panic(err)
 	}   
 
-	bgp_traffic := make(chan string)
-	log_message := make(chan string)
+	bgp_table := make(map[string][]string)
 
-	fmt.Println(edges["24"])
-
-
-	go bgp_tables()
-
-	messages <- "ping" 
-	messages <- "ping1" 
+	initializeBgpTables()
 
 }
