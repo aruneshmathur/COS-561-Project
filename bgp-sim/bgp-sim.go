@@ -69,22 +69,52 @@ type bgpEntry struct {
 	pref 	int
 	route	[] string
 	active	bool
+	available bool
 	rfd_penalty	int
 	rfd_supress	bool
 }
 
-func duplicateBgpEntryCheck(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (bool) {
-	for i := 0; i < len
-}
-
-func addBgpEntry(as string, bgpEntry bgpEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
-	if duplicateBgpEntryCheck(bgpEntry, bgp_table[as]) {
-		bgp_table[as] = append(bgp_table[as], bgpEntry)
-	} else {
-		if false bgp_table[as].rfd_supress {
-			bgp_table[as].active = true
+func searchBgpEntryPrefix(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (int, bool) {
+	for i := 0; i < len(bgpEntryArray); i++ {
+		if(bgpEntry.prefix == bgpEntryArray[i].prefix) {
+			return index, true
 		}
 	}
+	return 0, false
+}
+
+func searchBgpEntryActivePrefix(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (int, bool) {
+	for i := 0; i < len(bgpEntryArray); i++ {
+		if(bgpEntry.prefix == bgpEntryArray[i].prefix &&
+			bgpEntryArray[i]) {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+func searchBgpEntry(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (int, bool) {
+	for i := 0; i < len(bgpEntryArray); i++ {
+		if bgpEntry.prefix == bgpEntryArray[i].prefix {
+			if len(bgpEntryArray[i].route) == len(bgpEntry.route) {
+				for j := 0; j < len(bgpEntry.route); j++ {
+					if bgpEntryArray[i].route[j] != bgpEntry.route[j] {
+						return 0, false
+					}
+				}
+				return i, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func duplicateBgpEntryCheck(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (bool) {
+	index, duplicate := searchBgpEntry(bgpEntry, bgpEntryArray)
+	return duplicate
+}
+
+func announceBgpEntry(as string, bgpEntry bgpEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	bgpEntry_copy = deepcopy.Copy(bgpEntry)
 	bgpEntry_copy.route = append(bgpEntry_copy.route, as)
 	for i := 0; i < len(topology[as]); i++ {
@@ -92,8 +122,35 @@ func addBgpEntry(as string, bgpEntry bgpEntry, topology map[string][]string, bgp
 	}
 }
 
-func delBgpEntry(as string, topology map[string][]string, bgp_table map[string][][]string) {
-	
+func addBgpEntry(as string, bgpEntry bgpEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
+	if false duplicateBgpEntryCheck(bgpEntry, bgp_table[as]) {
+		bgp_table[as] = append(bgp_table[as], bgpEntry)
+	} else {
+		index, _ :=searchBgpEntry(bgpEntry, bgp_table[as])
+		bgp_table[as][index].pref = bgpEntry.pref 
+		bgp_table[as][index].enabled = true
+	}
+	active_as_entry_index, found := searchBgpEntryActivePrefix(bgpEntry, bgpEntryArray)
+	if found {
+		if bgpEntry.pref > bgp_table[as][active_as_entry_index].pref {
+			bgpEntry.active = true
+			bgp_table[as][active_as_entry_index].active = false
+			announceBgpEntry(as, bgpEntry, topology, bgp_table)
+			withdrawBgpEntry( )
+		}
+	} else
+		as_entry_index,_ := searchBgpEntryPrefix(bgpEntry, bgpEntryArray)
+		bgp_table[as][as_entry_index].active = true
+		announceBgpEntry(as, bgpEntry, topology, bgp_table)
+	}
+}
+
+func withdrawBgpEntry(as string, policies map[string][]int, topology map[string][]string, bgp_table map[string][][]string, root_as bool) {
+	 
+}
+
+func deleteBgpEntry(as string, policies map[string][]int, topology map[string][]string, bgp_table map[string][][]string, root_as bool) {
+	 
 }
 
 func supressBgpEntry(as string, topology map[string][]string, bgp_table map[string][][]string) {
