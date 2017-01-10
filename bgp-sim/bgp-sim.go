@@ -221,8 +221,7 @@ func manageRfd(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, 
 
 func initializeBgpTables(policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	for i := range topology {
-		newBgpEntry := bgpEntry{prefix: i, pref: 0, route: {i}, active: false, available: true, rfd_penalty: 0, rfd_supress: false, rfd_time_reset: false}
-		addBgpEntry(newBgpEntry)
+		addBgpEntry(i, bgpEntry{prefix: i, pref: 0, route: {i}, active: false, available: true, rfd_penalty: 0, rfd_supress: false, rfd_time_reset: false}, policies, topology, bgp_table)
 	}
 }
 
