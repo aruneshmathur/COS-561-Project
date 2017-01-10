@@ -41,30 +41,34 @@ type asPolicyEntry struct {
 }
 //POLICY MESSAGE SPEC: "prefix|half-life|max-supress|reuse|suppress"
 
-func readPolicy(path string) ([]int, error) {
+func readPolicy(path string) (asPolicyEntry, error) {
   file, err := os.Open(path)
   if err != nil {
-	return nil, err
+  return nil, err
   }
   defer file.Close()
 
   scanner := bufio.NewScanner(file)
-  line_int := []string{}
+  line := []string{}
+  line_int := []int{}
+
   for scanner.Scan() {
-	line := strings.Split(scanner.Text(), "|")
-	for _, i := range line {
-		j, err := strconv.Atoi(i)
-		if err != nil {
-			return nil, err
-		}
-		line_int = append(line_int, j)
-	}
+    line = strings.Split(scanner.Text(), "|")
   }
-  return line_int, scanner.Err()
+  prefix := line[len(line) - 1]
+  line = line[:len(line) - 1]
+  for _, i := range line {
+    j, err := strconv.Atoi(i)
+    if err != nil {
+      return nil, err
+    }
+    line_int = append(line_int, j)
+  }
+  return asPolicyEntry{prefix: prefix, rfd_penalty: line_int[0], half-life: line_int[1], max-supress: line_int[2], reuse: line_int[3], supress: line_int[4]}, scanner.Err()
 }
 
-func readPolicies(edges map[string][]string, directory string) (map[string][]int, error) {
-	policies := make(map[string][]string) //Map with keys AS 0 and values AS 1
+func readPolicies(edges map[string][]string, directory string) (map[string]asPolicyEntry, error) {
+	policies := make(map[string]asPolicyEntry) //Map with keys AS 0 and values AS 1
 	for as_name := range edges {
 		filename := directory + as_name + ".as"
 		policy, err := readPolicy()
@@ -127,17 +131,18 @@ func duplicateBgpEntryCheck(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) (bool) 
 	return duplicate
 }
 
-func announceBgpEntry(as string, bgpEntry bgpEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
+func announceBgpEntry(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	bgpEntry_copy = deepcopy.Copy(bgpEntry)
 	bgpEntry_copy.route = append(bgpEntry_copy.route, as)
 	for i := 0; i < len(topology[as]); i++ {
-		addBgpEntry(topology[as][i], bgpEntry_copy, topology, bgp_table)
+		addBgpEntry(topology[as][i], bgpEntry_copy, policies, topology, bgp_table)
 	}
 }
 
-func updateBgpEntries(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) {
+func updateBgpEntries(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	highest_pref := -1 
 	index := -1
+    bgpEntryArray := bgp_table[as];
 	for i := 0; i < len(bgpEntryArray); i++ {
 		if bgpEntry.prefix == bgpEntryArray[i].prefix &&
 			bgpEntryArray[i].enabled && 
@@ -151,28 +156,27 @@ func updateBgpEntries(bgpEntry bgpEntry, bgpEntryArray []bgpEntry) {
 		if false bgpEntryArray[index].active {
 			active_prefix_index, prefix_active := searchBgpEntryActivePrefix(bgpEntry, bgpEntryArray)
 			if prefix_active {
-				withdrawBgpEntry(  )
+				withdrawBgpEntry(as, bgpEntry, policies, topology, bgp_table)
 			} 
-			announceBgpEntry( )
+			announceBgpEntry(as, bgpEntry, policies, topology, bgp_table)
 		}
 	}
 }
 
-func addBgpEntry(as string, bgpEntry bgpEntry,policies map[string][]int, topology map[string][]string, bgp_table map[string][]bgpEntry) {
-
+func addBgpEntry(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	if false duplicateBgpEntryCheck(bgpEntry, bgp_table[as]) {
 		bgp_table[as] = append(bgp_table[as], bgpEntry)
-		go manageRfd(bgp_table[as][len(bgp_table[as]-1)], policies[as])
+		go manageRfd(as, bgp_table[as][len(bgp_table[as]-1)], policies, topology, bgp_table)
 	} 
 	index, _ :=searchBgpEntry(bgpEntry, bgp_table[as])
 	bgp_table[as][index].pref = bgpEntry.pref 
 	bgp_table[as][index].enabled = true
 	
-	updateBgpEntries(bgpEntry, bgpEntryArray)
+	updateBgpEntries(as, bgpEntry, policies, topology, bgp_table)
 }
 
-func withdrawBgpEntry(as string, policies map[string][]int, topology map[string][]string, bgp_table map[string][][]string, root_as bool) {
-	index, found := searchBgpEntry()
+func withdrawBgpEntry(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
+	index, found := searchBgpEntry(bgpEntry, bgp_table[as])
 	if found {
 		bgp_table[as][index].enabled = false
 		bgp_table[as][index].active = false
@@ -181,17 +185,18 @@ func withdrawBgpEntry(as string, policies map[string][]int, topology map[string]
 			bgp_table[as][index].rfd_supress = true
 			bgp_table[as][index].rfd_time_reset = true
 		}
-		updateBgpEntries() //ACTIVATE OTHER ROUTE POTENTIALLY 
+		updateBgpEntries(as, bgpEntry, policies, topology, bgp_table) //ACTIVATE OTHER ROUTE POTENTIALLY 
 		bgpEntry_copy = deepcopy.Copy(bgp_table[as][index])
 		bgpEntry_copy.route = bgpEntry_copy.route[:len(bgpEntry_copy.route)-1]
 		for i := 0; i < len(topology[as]); i++ {
-			withdrawBgpEntry(topology[as][i], bgpEntry_copy, topology, bgp_table)
+			withdrawBgpEntry(topology[as][i], bgpEntry_copy, policies, topology, bgp_table)
 		}
 	}
 }
 
-func manageRfd(bgpEntry bgpEntry, as_policy asPolicyEntry) {
+func manageRfd(as string, bgpEntry bgpEntry, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	timer := 0
+    asPolicyEntry := policies[as]
 	for {
 		if bgpEntry.rfd_time_reset {
 			timer = 0
@@ -201,20 +206,20 @@ func manageRfd(bgpEntry bgpEntry, as_policy asPolicyEntry) {
 			bgpEntry.rfd_penalty = bgpEntry.rfd_penalty/2
 			if bgpEntry.rfd_penalty <= asPolicyEntry.suppress {
 				bgpEntry.rfd_supress = false
-				updateBgpEntries( )
+				updateBgpEntries(as, bgpEntry, policies, topology, bgp_table)
 			}
 		}
 		if timer%asPolicyEntry.max-supress == 0 {
 			timer = 0
 			bgpEntry.rfd_supress = false
-			updateBgpEntries( )
+			updateBgpEntries(as, bgpEntry, policies, topology, bgp_table)
 		}
 		time.Sleep(time.Minute * 1)
 		timer++
 	}
 }
 
-func initializeBgpTables(as string, policies map[string][]int, topology map[string][]string, bgp_table map[string][][]string, root_as bool) {
+func initializeBgpTables(policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntry) {
 	for i := range topology {
 		newBgpEntry := bgpEntry{prefix: i, pref: 0, route: {i}, active: false, available: true, rfd_penalty: 0, rfd_supress: false, rfd_time_reset: false}
 		addBgpEntry(newBgpEntry)
