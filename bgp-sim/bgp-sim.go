@@ -138,14 +138,35 @@ func duplicateBgpEntryCheck(bgpEntry bgpEntryStruct, bgpEntryArray []bgpEntryStr
 }
 
 func announceBgpEntry(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntryStruct) {
-	bgpEntry_route := deepcopy.Copy(bgpEntry.route).([]string)
+	fmt.Println(" ")
+	fmt.Println("announceBgpEntry CALLED")
+	fmt.Println("AS:" + as)
+	fmt.Println("BGP ENTRY:")
+	fmt.Println(bgpEntry)
+	fmt.Println(" ")
 	for i := 0; i < len(topology[as]); i++ {
-		bgpEntry_route = append(bgpEntry_route, topology[as][i]) 
-		addBgpEntry(topology[as][i], bgpEntryStruct{prefix: bgpEntry.prefix, pref: bgpEntry.pref, route: bgpEntry_route, active: bgpEntry.active, available: bgpEntry.available, rfd_penalty: bgpEntry.rfd_penalty, rfd_supress: bgpEntry.rfd_supress, rfd_time_reset: bgpEntry.rfd_time_reset}, policies, topology, bgp_table)
+		bgpEntry_route := deepcopy.Copy(bgpEntry.route).([]string)
+		duplicate := false
+		for j := 0; j < len(bgpEntry_route); j++ {
+			if topology[as][i] == bgpEntry_route[j] {
+				duplicate = true
+			}
+		}
+
+		if duplicate == false {
+			bgpEntry_route = append(bgpEntry_route, topology[as][i]) 
+			addBgpEntry(topology[as][i], bgpEntryStruct{prefix: bgpEntry.prefix, pref: bgpEntry.pref, route: bgpEntry_route, active: false, available: true, rfd_penalty: bgpEntry.rfd_penalty, rfd_supress: bgpEntry.rfd_supress, rfd_time_reset: bgpEntry.rfd_time_reset}, policies, topology, bgp_table)
+		}
 	}
 }
 
 func updateBgpEntries(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntryStruct) {
+	fmt.Println(" ")
+	fmt.Println("updateBgpEntries CALLED")
+	fmt.Println("AS:" + as)
+	fmt.Println("BGP ENTRY:")
+	fmt.Println(bgpEntry)
+	fmt.Println(" ")	
 	highest_pref := -1 
 	index := -1
     bgpEntryArray := bgp_table[as];
@@ -160,6 +181,7 @@ func updateBgpEntries(as string, bgpEntry bgpEntryStruct, policies map[string]as
 	}
 	if index != -1 {
 		if bgpEntryArray[index].active == false {
+			fmt.Println("ACTIVE CHECK FALSE")
 			_, prefix_active := searchBgpEntryActivePrefix(bgpEntry, bgpEntryArray)
 			if prefix_active {
 				withdrawBgpEntry(as, bgpEntry, policies, topology, bgp_table)
@@ -171,6 +193,12 @@ func updateBgpEntries(as string, bgpEntry bgpEntryStruct, policies map[string]as
 }
 
 func addBgpEntry(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntryStruct) {
+	fmt.Println(" ")
+	fmt.Println("addBgpEntry CALLED")
+	fmt.Println("AS:" + as)
+	fmt.Println("BGP ENTRY:")
+	fmt.Println(bgpEntry)
+	fmt.Println(" ")
 	if duplicateBgpEntryCheck(bgpEntry, bgp_table[as]) == false {
 		bgp_table[as] = append(bgp_table[as], bgpEntry)
 		go manageRfd(as, bgp_table[as][len(bgp_table[as])-1], policies, topology, bgp_table)
@@ -202,11 +230,11 @@ func withdrawBgpEntry(as string, bgpEntry bgpEntryStruct, policies map[string]as
 }
 
 func manageRfd(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntryStruct) {
-	timer := 0
+	timer := 1
     asPolicyEntry := policies[as]
 	for {
 		if bgpEntry.rfd_time_reset {
-			timer = 0
+			timer = 1
 			bgpEntry.rfd_time_reset = false
 		}
 		if timer%asPolicyEntry.half_life == 0 {
@@ -217,7 +245,7 @@ func manageRfd(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyE
 			}
 		}
 		if timer%asPolicyEntry.max_supress == 0 {
-			timer = 0
+			timer = 1
 			bgpEntry.rfd_supress = false
 			updateBgpEntries(as, bgpEntry, policies, topology, bgp_table)
 		}
@@ -228,7 +256,9 @@ func manageRfd(as string, bgpEntry bgpEntryStruct, policies map[string]asPolicyE
 
 func initializeBgpTables(policies map[string]asPolicyEntry, topology map[string][]string, bgp_table map[string][]bgpEntryStruct) {
 	for i := range topology {
+		fmt.Println(i)
 		addBgpEntry(i, bgpEntryStruct{prefix: policies[i].prefix, pref: 0, route: []string{i}, active: false, available: true, rfd_penalty: 0, rfd_supress: false, rfd_time_reset: false}, policies, topology, bgp_table)
+		
 	}
 }
 
@@ -256,10 +286,11 @@ func main() {
 
 	fmt.Println(policies)
 	fmt.Println(topology)
-	fmt.Println(bgp_table)
+
 
 	initializeBgpTables(policies, topology, bgp_table)
-		fmt.Println(bgp_table)
-
+fmt.Println(bgp_table)
 
 }
+
+
