@@ -10,7 +10,6 @@ import (
   "github.com/mohae/deepcopy"
 )
 
-///### TODO: PSUDO FUNCTION CALLS USED IN SOME PLACES CURRENTLY ###
 ///### TODO: LOGGING TO CONSOLE ###
 
 func readTopology(path string) (map[string][]string, error) {
@@ -264,6 +263,16 @@ func initializeBgpTables(policies map[string]asPolicyEntry, topology map[string]
 
 //BGP MESSAGE SPEC: "src_as_number|prefix|announce|delete|rfd_damp|rfd_release"
 
+func prettyPrinter(bgp_table map[string][]bgpEntryStruct) {
+	fmt.Println("BGP TABLE:")
+	for k, bgp_entry := range bgp_table {
+		fmt.Println("\tAS:", k)
+		for i := 0; i < len(bgp_entry); i++ {
+			fmt.Println("\t\tPREFIX: ", bgp_entry[i].prefix, "PREF:", bgp_entry[i].pref, "ROUTE:", bgp_entry[i].route, "ACTIVE:", bgp_entry[i].active, "AVAIL:", bgp_entry[i].available, "RFD_PEN:", bgp_entry[i].rfd_penalty, "RFD_SUP:", bgp_entry[i].rfd_supress, "RFD_RESET:", bgp_entry[i].rfd_time_reset)
+		}
+	}
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("ERROR: To Few Args")
@@ -284,13 +293,9 @@ func main() {
 
 	bgp_table := make(map[string][]bgpEntryStruct)
 
-	fmt.Println(policies)
-	fmt.Println(topology)
+	initializeBgpTables(policies, topology, bgp_table, )
+	prettyPrinter(bgp_table)
 
-
-	initializeBgpTables(policies, topology, bgp_table)
-fmt.Println(bgp_table)
 
 }
-
 
