@@ -10,8 +10,6 @@ import (
   "github.com/mohae/deepcopy"
 )
 
-///### TODO: LOGGING TO CONSOLE ###
-
 func readTopology(path string) (map[string][]string, error) {
   file, err := os.Open(path)
   if err != nil {
